@@ -3,11 +3,15 @@
 namespace App\Service;
 
 use Generator;
+use Psr\Cache\InvalidArgumentException;
 use RuntimeException;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
 class GtfsService implements GtfsServiceInterface
 {
     private string $gtfsPath;
+    private CacheInterface $cache;
 
     private const STOP_TIMES_FILE = '/stop_times.txt';
     private const TRIPS_FILE = '/trips.txt';
@@ -15,24 +19,44 @@ class GtfsService implements GtfsServiceInterface
     /**
      * Get gtfs sources path
      * @param string $gtfsPath
+     * @param CacheInterface $cache
      */
-    public function __construct(string $gtfsPath)
+    public function __construct(string $gtfsPath, CacheInterface $cache)
     {
         $this->gtfsPath = $gtfsPath;
+        $this->cache = $cache;
     }
 
     /**
      * Get fixed schedules from gtfs sources
      * @param string $stopId
      * @return array
+     * @throws InvalidArgumentException
      */
     public function getFixedSchedules(string $stopId): array
     {
-        $stopTimes = $this->parseCsvFile($this->getFilePath(self::STOP_TIMES_FILE));
+        $stopTimes = $this->getCachedCsvFile($this->getFilePath(self::STOP_TIMES_FILE));
         $trips = $this->getTripsById();
         $schedules = $this->filterSchedulesByStopId($stopTimes, $trips, $stopId);
 
         return $this->filterSchedulesByCurrentTime($schedules);
+    }
+
+    /**
+     * @throws InvalidArgumentException
+     */
+    private function getCachedCsvFile(string $filePath): Generator
+    {
+        $cacheKey = 'gtfs_'.md5($filePath);
+
+        $data = $this->cache->get($cacheKey, function(ItemInterface $item) use ($filePath) {
+            $item->expiresAfter(3600);
+            return iterator_to_array($this->parseCsvFile($filePath));
+        });
+
+        foreach ($data as $row) {
+            yield $row;
+        }
     }
 
     /**
