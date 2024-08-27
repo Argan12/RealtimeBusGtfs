@@ -30,9 +30,6 @@ jobs:
           path: .
           options: --exclude=vendor
 
-      - name: Install API Key secret 🔑
-        run: echo "API_KEY=${{ secrets.API_KEY }}" >> .env.test.local
-
       - name: Run unit tests ✅
         run: php bin/phpunit
         env:
