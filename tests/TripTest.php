@@ -2,48 +2,58 @@
 
 namespace App\Tests;
 
-use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Tests\Factory\BusStopFactory;
+use App\Service\GtfsService;
+use Monolog\Test\TestCase;
 use PHPUnit\Framework\Attributes\Test;
-use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
-use Zenstruck\Foundry\Test\Factories;
-use Zenstruck\Foundry\Test\ResetDatabase;
+use PHPUnit\Framework\MockObject\Exception;
+use Psr\Cache\InvalidArgumentException;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
-class TripTest extends ApiTestCase
+class TripTest extends TestCase
 {
-    use ResetDatabase, Factories;
-    
+    private const GTFS_PATH = __DIR__ . '/Fixtures/Gtfs';
+
     /**
-     * Test if trip is not found, 404 is returned
+     * Test get trips
      * @return void
-     * @throws TransportExceptionInterface
+     * @throws Exception
+     * @throws InvalidArgumentException
      */
     #[Test]
-    public function testTripNotFound(): void
+    public function testGetTrips(): void
     {
-        BusStopFactory::createOne([
-            'stopId' => '10'
-        ])->getStopId();
+        $cache = $this->createMock(CacheInterface::class);
+        $cacheItem = $this->createMock(ItemInterface::class);
 
-        $client = static::createClient();
-        $client->request('GET', '/api/trips/0');
+        $cacheItem->method('get')->willReturn([
+            [
+                'trip_id' => '1',
+                'arrival_time' => $this->mockCurrentTime('+ 10 minutes'),
+                'departure_time' => $this->mockCurrentTime('12 minutes'),
+                'stop_id' => '12176'
+            ]
+        ]);
 
-        $this->assertResponseStatusCodeSame(404);
+        $cache->method('get')->willReturn($cacheItem->get());
+
+        $gtfsService = new GtfsService(self::GTFS_PATH, $cache);
+
+        $schedules = $gtfsService->getFixedSchedules('12176');
+        $this->assertNotEmpty($schedules);
+        $this->assertEquals('12176', $schedules[0]['stopId']);
     }
 
     /**
-     * Test if ok, 200 is returned
-     * @return void
-     * @throws TransportExceptionInterface
+     * Add n minutes to current time
+     * @param string $minutesToAdd '+n minutes'
+     * @return string
      */
-    #[Test]
-    public function testTripOk(): void
+    private function mockCurrentTime(string $minutesToAdd): string
     {
-        $stopId = BusStopFactory::createOne()->getStopId();
+        $currentDateTime = new \DateTime();
+        $currentDateTime->modify($minutesToAdd);
 
-        $client = static::createClient();
-        $client->request('GET', '/api/trips/'.$stopId);
-
-        $this->assertResponseStatusCodeSame(200);
+        return $currentDateTime->format('H:i:s');
     }
 }
