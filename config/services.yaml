@@ -31,8 +31,3 @@ services:
     App\Service\TripService:
         arguments:
             $pbFilePath: '%env(GTFS_FILE_PATH)%'
-
-    App\State\AddressProvider:
-        arguments:
-            $client: '@Symfony\Contracts\HttpClient\HttpClientInterface'
-            $addressApiUrl: '%env(ADDRESS_API)%'

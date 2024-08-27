@@ -1,0 +1,2 @@
+route_id,service_id,trip_id,trip_headsign,direction_id,block_id,wheelchair_accessible,bikes_allowed
+92,T24_RO-2-31,1,Mairie - V. Schoelcher N.-D.-DE-BONDEVILLE,1,,,
