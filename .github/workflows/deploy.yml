@@ -47,10 +47,10 @@ jobs:
           key: ${{ secrets.PRIVATE_KEY }}
           command_timeout: 30m
           script: |
-            rm -r ./www/*
-            rm -rf ./www/.env
-            rm -rf ./www/.htaccess
-            cd ./www
+            rm -r ./gtfs/*
+            rm -rf ./gtfs/.env
+            rm -rf ./gtfs/.htaccess
+            cd ./gtfs
             git clone git@github.com:Argan12/RealtimeBusGtfs.git .
             wait $BACK_PID
             rm -rf .git
