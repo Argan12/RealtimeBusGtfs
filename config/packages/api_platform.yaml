@@ -1,0 +1,78 @@
+when@dev:
+    api_platform:
+        title: RealtimeBusGtfs Docs
+        version: 1.0.0
+        formats:
+            json: ['application/json']
+            jsonld: ['application/ld+json']
+        docs_formats:
+            json: ['application/json']
+            html: ['text/html']
+        defaults:
+            stateless: true
+            cache_headers:
+                vary: ['Content-Type', 'Authorization', 'Origin']
+            extra_properties:
+                standard_put: true
+                rfc_7807_compliant_errors: true
+        event_listeners_backward_compatibility_layer: false
+        keep_legacy_inflector: false
+        use_symfony_listeners: true
+        mapping:
+            paths: [ '%kernel.project_dir%/src/Entity' ]
+        swagger:
+            api_keys:
+                X-AUTH-TOKEN:
+                    name: X-AUTH-TOKEN
+                    type: header
+
+when@staging:
+    api_platform:
+        enable_swagger_ui: false
+        enable_re_doc: false
+        enable_entrypoint: false
+        enable_docs: false
+        enable_profiler: false
+        formats:
+            json: ['application/json']
+            jsonld: ['application/ld+json']
+        mapping:
+            paths: ['%kernel.project_dir%/src/Entity']
+        use_symfony_listeners: true
+
+when@test:
+    api_platform:
+        title: RealtimeBusApi Docs
+        version: 1.0.0
+        formats:
+            json: ['application/json']
+            jsonld: ['application/ld+json']
+        docs_formats:
+            json: ['application/json']
+            html: ['text/html']
+        defaults:
+            stateless: true
+            cache_headers:
+                vary: ['Content-Type', 'Authorization', 'Origin']
+            extra_properties:
+                standard_put: true
+                rfc_7807_compliant_errors: true
+        event_listeners_backward_compatibility_layer: false
+        keep_legacy_inflector: false
+        use_symfony_listeners: true
+        mapping:
+            paths: [ '%kernel.project_dir%/src/Entity' ]
+
+when@prod:
+    api_platform:
+        enable_swagger_ui: false
+        enable_re_doc: false
+        enable_entrypoint: false
+        enable_docs: false
+        enable_profiler: false
+        formats:
+            json: ['application/json']
+            jsonld: ['application/ld+json']
+        mapping:
+            paths: ['%kernel.project_dir%/src/Entity']
+        use_symfony_listeners: true

@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}
+
+    steps:
+      - name: Checkout code ✔️
+        uses: actions/checkout@v3
+
+      - name: Set up PHP ⚙️
+        uses: shivammathur/setup-php@2.28.0
+        with:
+          php-version: '8.2'
+
+      - name: Install dependencies 🔨
+        run: composer install --ignore-platform-reqs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}
+
+      - name: Lint PHP files 👕
+        uses: overtrue/phplint@main
+        with:
+          path: .
+          options: --exclude=vendor
+
+      - name: Run unit tests ✅
+        run: php bin/phpunit
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_STAGING }}

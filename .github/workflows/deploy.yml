@@ -1,0 +1,156 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency: production_environment
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code ✔️
+        uses: actions/checkout@v3
+
+      - name: Set up PHP ⚙️
+        uses: shivammathur/setup-php@2.28.0
+        with:
+          php-version: '8.2'
+
+      - name: Install dependencies 🔨
+        run: composer install --ignore-platform-reqs
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Lint PHP files 👕
+        uses: overtrue/phplint@main
+        with:
+          path: .
+          options: --exclude=vendor
+
+      - name: Install API Key secret 🔑
+        run: echo "API_KEY=${{ secrets.API_KEY }}" >> .env.test.local
+
+      - name: Run unit tests ✅
+        run: php bin/phpunit
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy 🚀
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.TARGET_HOST }}
+          username: ${{ secrets.TARGET_USER }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          command_timeout: 30m
+          script: |
+            rm -r ./www/*
+            rm -rf ./www/.env
+            rm -rf ./www/.htaccess
+            cd ./www
+            git clone git@github.com:Argan12/RealtimeBusGtfs.git .
+            wait $BACK_PID
+            rm -rf .git
+            rm -rf .github
+            rm -rf migrations
+            rm -rf tests
+            rm .gitignore
+            rm README.md
+            rm .env.staging
+            rm .env.test
+            rm .phplint.yml
+            rm compose.override.yaml
+            rm compose.yaml
+            rm phpunit.xml.dist
+            rm .phpunit.cache
+            mv ./public/.htaccess ./
+            mv ./public/index.prod.php ./index.php
+            rm -rf ./config/secrets/dev
+            rm -rf ./config/secrets/staging
+            export DATABASE_URL="${{ secrets.DATABASE_URL }}"
+            composer2 install --ignore-platform-reqs --no-dev --optimize-autoloader
+            composer2 dump-autoload --optimize --no-dev --classmap-authoritative
+            php bin/console cache:clear
+            
+  tag:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository code ⏬
+        uses: actions/checkout@v3
+
+      - name: Get last commit message
+        id: commit_message
+        run: |
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+          echo "Last commit message: $COMMIT_MESSAGE"
+          echo "::set-output name=commit_message::$COMMIT_MESSAGE"
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          TAG=$(git tag --list | tail -n 1)
+    
+          if [ -z "$TAG" ]; then
+            echo "No tags found, defaulting to v0.0.0"
+            echo "::set-output name=tag::v0.0.0"
+          else
+            if [[ "$TAG" =~ ^[0-9]+\.[0-9]+$ ]]; then
+               TAG="${TAG}.0"
+            fi
+            if [[ "$TAG" != v* ]]; then
+              TAG="v$TAG"
+            fi
+            echo "Latest tag: $TAG"
+            echo "::set-output name=tag::$TAG"
+          fi
+
+      - name: Calculate next tag
+        id: next_tag
+        run: |
+          TAG=${{ steps.get_tag.outputs.tag }}
+          echo "Latest tag: $TAG"
+
+          MAJOR=$(echo $TAG | cut -d'.' -f1 | sed 's/v//')
+          MINOR=$(echo $TAG | cut -d'.' -f2)
+          PATCH=$(echo $TAG | cut -d'.' -f3)
+
+          COMMIT_MESSAGE="${{ steps.commit_message.outputs.commit_message }}"
+
+          if [[ "$COMMIT_MESSAGE" == *"🎉"* ]]; then
+            NEXT_MAJOR=$((MAJOR + 1))
+            NEXT_MINOR=0
+            NEXT_PATCH=0
+          elif [[ "$COMMIT_MESSAGE" == *"✨"* ]]; then
+            NEXT_MAJOR=$MAJOR
+            NEXT_MINOR=$((MINOR + 1))
+            NEXT_PATCH=0
+          elif [[ "$COMMIT_MESSAGE" == *"🐛"* ]]; then
+            NEXT_MAJOR=$MAJOR
+            NEXT_MINOR=$MINOR
+            NEXT_PATCH=$((PATCH + 1))
+          else
+            NEXT_MAJOR=$MAJOR
+            NEXT_MINOR=$MINOR
+            NEXT_PATCH=$((PATCH + 1))
+          fi
+          
+          NEXT_TAG="v$NEXT_MAJOR.$NEXT_MINOR.$NEXT_PATCH"
+
+          echo "Next tag: $NEXT_TAG"
+          echo "::set-output name=next_tag::$NEXT_TAG"
+
+      - name: Push new tag 🏷️
+        run: |
+          NEXT_TAG=${{ steps.next_tag.outputs.next_tag }}
+          git tag $NEXT_TAG
+          git push origin $NEXT_TAG
